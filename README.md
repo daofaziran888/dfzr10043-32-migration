@@ -73,6 +73,31 @@ npm run dev
 | 抽检样本 | `sample_check` | 抽检样本 | 样本编号、关联批次、抽样比例 |
 | 交接包 | `handoff_pack` | 交接包 | 交接编号、关联批次、目标系统 |
 
+## 版本关联迁移（结构化版本绑定）
+
+历史流程执行只保存版本字符串，升级后把执行依据迁移为「模板 + 版本号原字符串 +
+发布记录」的结构化版本关联，实现位于 `backend/app/version_binding/`：
+
+- `resolver.py`：模板作用域内按版本号**原字符串精确匹配**发布记录，不做数值化，
+  因此同模板的 `1.1` 与 `1.10` 分别定位、两个模板各自的 `1.10` 不会串号；
+- `migration.py`：逐条解析并把 `版本关联` 写回执行核对清单，`历史版本字符串`
+  原样保留；每条结论立即落检查点，中断恢复时已确认依据直接复用、不重新解析；
+  关联不到模板或发布记录、或执行本就没有历史绑定时标记「待核实」并附原因码；
+- `receipts.py`：切换中断期 `dual_read` 模式下，旧执行仍可按在途采集回执自带的
+  版本字符串查询来源版本；切换完成后的 `structured` 模式只认结构化关联，
+  待核实记录不得作为已确认来源消费；
+- `handoff.py`：归集消费前读取执行实际绑定版本核对在途旧回执，交接包保留每个
+  执行引用的来源版本字符串与回执编号，存在待核实时拒绝出包。
+
+演练素材（见 `backend/app/seed.py`）：两个模板 `FLOW-T01/FLOW-T02`、三条发布记录
+（T01 的 1.1、1.10 与 T02 的 1.10）、四条执行（含一条无历史绑定）和三条在途回执。
+
+```bash
+cd backend
+.venv/bin/python -m scripts.drill_version_binding   # 端到端升级演练（含中断/恢复）
+.venv/bin/python -m pytest tests/test_version_binding_migration.py -q
+```
+
 ## 约定
 
 - 全部模块共享`frontend/src/views/WorkbenchView.vue|tsx`和一套资源路由。

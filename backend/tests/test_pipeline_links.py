@@ -269,11 +269,14 @@ class TestDedupDomainLogic:
         assert is_dirty_row({"a": "x", "b": "y"}, ["a", "b"]) is False
 
     def test_dedup_by_window_removes_duplicates(self):
+        from datetime import datetime, timedelta, timezone
         from app.dedup import dedup_by_window
+        # 窗口按当前时间计算，夹具日期不能写死，否则跨天后用例会失效
+        today = datetime.now(timezone(timedelta(hours=8))).isoformat(timespec="seconds")
         rows = [
-            {"id": 1, "key": "a", "生成时间": "2026-11-21T00:00:00"},
-            {"id": 2, "key": "a", "生成时间": "2026-11-21T00:00:00"},
-            {"id": 3, "key": "b", "生成时间": "2026-11-21T00:00:00"},
+            {"id": 1, "key": "a", "生成时间": today},
+            {"id": 2, "key": "a", "生成时间": today},
+            {"id": 3, "key": "b", "生成时间": today},
         ]
         result = dedup_by_window(rows, ["key"])
         assert len(result) == 2
